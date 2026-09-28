@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Recipe Box — Admin</title>
+<style>
+  :root { --ink:#1f2a1f; --paper:#fbf6ea; --line:#e7dcc2; --paprika:#c0432b; --muted:#6b6250; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:var(--ink); color:#f3ecd9; padding:2rem 1rem; }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 { margin:0 0 .3rem; }
+  p.note { color:#c9c2ad; margin:0 0 1.5rem; }
+  form { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+  input { flex:1 1 260px; padding:.65rem .8rem; border-radius:4px; border:1px solid var(--line); font-size:1rem; }
+  button { padding:.65rem 1.2rem; border:none; border-radius:4px; background:var(--paprika); color:#fff; font-weight:600; font-size:1rem; cursor:pointer; }
+  #error { color:#ff9c8a; margin:0 0 1rem; }
+  .stats { display:flex; gap:1rem; margin-bottom:1rem; flex-wrap:wrap; }
+  .stat { background:var(--paper); color:#2a2318; border-radius:6px; padding:.8rem 1.2rem; }
+  .stat b { display:block; font-size:1.6rem; }
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; background:var(--paper); color:#2a2318; border-radius:6px; overflow:hidden; }
+  th, td { text-align:left; padding:.6rem .8rem; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { background:#efe5cb; }
+  td.favs { color:var(--muted); font-size:.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Admin — registered users</h1>
+  <p class="note">Shows usernames, sign-up dates and saved favorites. Passwords are stored only as hashes and can never be viewed.</p>
+  <form id="token-form">
+    <input id="token" type="password" placeholder="Admin token" autocomplete="off" required />
+    <button type="submit">View users</button>
+  </form>
+  <p id="error" role="alert" hidden></p>
+  <section id="result" hidden>
+    <div class="stats">
+      <div class="stat"><b id="total-users">0</b>users</div>
+      <div class="stat"><b id="total-favs">0</b>saved favorites</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Username</th><th>Joined (UTC)</th><th>Favorites</th><th>Saved recipes</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+const form = document.getElementById("token-form");
+const errorEl = document.getElementById("error");
+const result = document.getElementById("result");
+const rows = document.getElementById("rows");
+
+function cell(text, cls) {
+  const td = document.createElement("td");
+  td.textContent = text;            // textContent: recipe names are never treated as HTML
+  if (cls) td.className = cls;
+  return td;
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  errorEl.hidden = true;
+  result.hidden = true;
+  try {
+    const res = await fetch("/api/admin/users", {
+      headers: { "X-Admin-Token": document.getElementById("token").value },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Request failed.");
+    document.getElementById("total-users").textContent = data.total_users;
+    document.getElementById("total-favs").textContent = data.total_favorites;
+    rows.replaceChildren();
+    data.users.forEach((u) => {
+      const tr = document.createElement("tr");
+      tr.append(cell(u.id), cell(u.username), cell(u.created_at), cell(u.favorites_count),
+                cell(u.favorites.join(", ") || "—", "favs"));
+      rows.appendChild(tr);
+    });
+    if (data.users.length === 0) {
+      const tr = document.createElement("tr");
+      const td = cell("No users have signed up yet.");
+      td.colSpan = 5;
+      tr.appendChild(td);
+      rows.appendChild(tr);
+    }
+    result.hidden = false;
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.hidden = false;
+  }
+});
+</script>
+</body>
+</html>
